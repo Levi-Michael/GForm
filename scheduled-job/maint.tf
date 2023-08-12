@@ -1,21 +1,17 @@
 #TODO 
-## Locals
-locals {
-  module-source = "../"
-}
 ## Create a project 
 module "project" {
-  source          = "${local.module-source}project"
+  source          = "git::github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/project"
   billing_account = "123456-123456-123456"
-  name            = "myproject"
-  parent          = "folders/1234567890"
-  prefix          = "foo"
+  name            = "project-00"
+  prefix          = "scheduled-job"
+  # If you useing as an organization you need to provide a parent folder for the project.
+  # parent          = "folders/1234567890"
   services = [
-    "container.googleapis.com",
-    "stackdriver.googleapis.com"
+    "cloudapis.googleapis.com"
   ]
 }
-# tftest modules=1 resources=3 inventory=basic.yaml
+
 ## Create Service account
 ## Folders permissions ?
 ## Create Google cloud storage

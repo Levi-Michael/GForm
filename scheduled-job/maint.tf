@@ -47,6 +47,16 @@ module "gcs" {
 }
 
 ## Create Docker artifact registry
+module "docker_artifact_registry" {
+  source     = "git::github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/artifact-registry"
+  project_id = module.project.project_id
+  location   = "me-west1"
+  name       = "scheduled-job-docker_artifact"
+  iam = {
+    "roles/artifactregistry.admin" = ["ServiceAccount:${module.service-account.email}"]
+  }
+}
+
 ## Create resource local_file Dockerfile
 ## Create resource local_file Copy Script
 ## Create null resource docker_build Build Image

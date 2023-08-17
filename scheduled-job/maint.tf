@@ -80,6 +80,20 @@ resource "local_file" "requirements" {
 }
 
 ## Create resource local_file Copy Script
+resource "local_file" "copy-script" {
+  content_base64 = filebase64("${path.module}/script.py")
+  filename = "${path.cwd}/script.py"
+}
+
 ## Create null resource docker_build Build Image
+resource "null_resource" "docker_build" {
+  provisioner "local-exec" {
+    command = <<EOT
+    gcloud config set project "${module.project.project_id}"
+    gcloud build submit --tag me-west1-docker.pkg.dev/${module.project.project_id}/${module.docker_artifact_registry.name}/python-slim:latest
+
+    EOT
+  }
+}
 ## Create Google Cloud run JOB
 ## Create Google Cloud Scheduler - cron job

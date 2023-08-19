@@ -2,7 +2,7 @@
 locals {
   billing_account = "123456-123456-123456"
   project_prefix = "scheduled-job"
-  project_name = "project-05"
+  project_name = "project-06"
   location = "us-central1"
 
 }
@@ -96,7 +96,7 @@ resource "null_resource" "docker_build" {
   provisioner "local-exec" {
     command = <<EOT
     gcloud config set project ${module.project.project_id}
-    gcloud builds submit --tag us-central1-docker.pkg.dev/${module.project.project_id}/${module.docker_artifact_registry.name}/python-slim:latest
+    gcloud builds submit --tag ${local.location}-docker.pkg.dev/${module.project.project_id}/${module.docker_artifact_registry.name}/python-slim:latest
     EOT
   }
   depends_on = [ 
@@ -104,30 +104,30 @@ resource "null_resource" "docker_build" {
    ]
 }
 
-# ## Create Google Cloud run JOB
-# resource "google_cloud_run_v2_job" "default" {
-#   project = module.project.project_id
-#   name     = "${module.project.project_id}cloudrun-job"
-#   location = local.location
+## Create Google Cloud run JOB
+resource "google_cloud_run_v2_job" "default" {
+  project = module.project.project_id
+  name     = "${module.project.project_id}cloudrun-job"
+  location = local.location
 
-#   template {
-#     template {
-#       containers {
-#         image = "${local.location}-docker.pkg.dev/${module.project.project_id}/${module.docker_artifact_registry.name}/python-slim:latest"
-#         command = ["python3", "script.py"]
-#       }
-#       service_account = module.service-account.email
-#     }
-#   }
-#   lifecycle {
-#       ignore_changes = [
-#         launch_stage,
-#       ]
-#     }
-#   depends_on = [
-#     resource.null_resource.docker_build,
-#     module.docker_artifact_registry
-#   ]
-# }
+  template {
+    template {
+      containers {
+        image = "${local.location}-docker.pkg.dev/${module.project.project_id}/${module.docker_artifact_registry.name}/python-slim:latest"
+        command = ["python3", "script.py"]
+      }
+      service_account = module.service-account.email
+    }
+  }
+  lifecycle {
+      ignore_changes = [
+        launch_stage,
+      ]
+    }
+  depends_on = [
+    resource.null_resource.docker_build,
+    module.docker_artifact_registry
+  ]
+}
 
 ## Create Google Cloud Scheduler - cron job

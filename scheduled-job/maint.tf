@@ -1,11 +1,17 @@
 #TODO 
+locals {
+  billing_account = "123456-123456-123456"
+  project_prefix = "scheduled-job"
+  project_name = "project-05"
+  location = "us-central1"
 
+}
 ## Create a project 
 module "project" {
   source          = "git::github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/project"
-  name            = "project-03"
-  billing_account = "123456-123456-123456"
-  prefix          = "scheduled-job"
+  name            = local.project_name
+  billing_account = local.billing_account
+  prefix          = local.project_prefix
   project_create = true
   # If you useing as an organization you need to provide a parent folder for the project.
   # parent          = "folders/1234567890"
@@ -13,10 +19,10 @@ module "project" {
     "cloudbuild.googleapis.com",
     "serviceusage.googleapis.com",
     "run.googleapis.com",
-    "cloudresourcemanger.googleapis.com",
+    "cloudresourcemanager.googleapis.com",
     "artifactregistry.googleapis.com",
     "cloudscheduler.googleapis.com",
-    "compute.googleapis.com"
+    "compute.googleapis.com",
   ]
 }
 
@@ -46,7 +52,7 @@ module "gcs" {
   project_id = module.project.project_id
   name       = "${module.project.project_id}_cloudbuild"
   versioning = true
-  location = "me-west1"
+  location = local.location
   storage_class = "REGIONAL"
   force_destroy = true
 
@@ -59,17 +65,17 @@ module "gcs" {
 module "docker_artifact_registry" {
   source     = "git::github.com/GoogleCloudPlatform/cloud-foundation-fabric/modules/artifact-registry"
   project_id = module.project.project_id
-  location   = "me-west1"
+  location   = local.location
   format = {docker = {}}
   name       = "${module.project.project_id}-artifact"
-  iam = {
-    "roles/artifactregistry.admin" = ["ServiceAccount:${module.service-account.email}"]
-  }
+  depends_on = [ 
+    module.gcs
+   ]
 }
 
 ## Create resource local_file Dockerfile
 resource "local_file" "dockerfile" {
-  content = "FROM python:3.9-slim \nWORKDIR  /app \nCOPY requirements.txt requirements.txt \nCOPY ./script.py script.py \nRUN pip install -r requirements.txt"
+  content = "FROM python:3.9-slim \nWORKDIR /app \nCOPY ./requirements.txt requirements.txt \nCOPY ./script.py script.py \nRUN pip install -r requirements.txt"
   filename = "./Dockerfile"
 }
 
@@ -79,21 +85,49 @@ resource "local_file" "requirements" {
   filename = "./requirements.txt"
 }
 
-## Create resource local_file Copy Script
-resource "local_file" "copy-script" {
-  content_base64 = filebase64("${path.module}/script.py")
-  filename = "${path.cwd}/script.py"
-}
+# ## Create resource local_file Copy Script
+# resource "local_file" "copy-script" {
+#   content_base64 = filebase64("./script.py") #${path.module}
+#   filename = "${path.cwd}/script.py"
+# }
 
 ## Create null resource docker_build Build Image
 resource "null_resource" "docker_build" {
   provisioner "local-exec" {
     command = <<EOT
-    gcloud config set project "${module.project.project_id}"
-    gcloud build submit --tag me-west1-docker.pkg.dev/${module.project.project_id}/${module.docker_artifact_registry.name}/python-slim:latest
-
+    gcloud config set project ${module.project.project_id}
+    gcloud builds submit --tag us-central1-docker.pkg.dev/${module.project.project_id}/${module.docker_artifact_registry.name}/python-slim:latest
     EOT
   }
+  depends_on = [ 
+    module.docker_artifact_registry
+   ]
 }
-## Create Google Cloud run JOB
+
+# ## Create Google Cloud run JOB
+# resource "google_cloud_run_v2_job" "default" {
+#   project = module.project.project_id
+#   name     = "${module.project.project_id}cloudrun-job"
+#   location = local.location
+
+#   template {
+#     template {
+#       containers {
+#         image = "${local.location}-docker.pkg.dev/${module.project.project_id}/${module.docker_artifact_registry.name}/python-slim:latest"
+#         command = ["python3", "script.py"]
+#       }
+#       service_account = module.service-account.email
+#     }
+#   }
+#   lifecycle {
+#       ignore_changes = [
+#         launch_stage,
+#       ]
+#     }
+#   depends_on = [
+#     resource.null_resource.docker_build,
+#     module.docker_artifact_registry
+#   ]
+# }
+
 ## Create Google Cloud Scheduler - cron job
